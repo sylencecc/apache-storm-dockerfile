@@ -1,54 +1,54 @@
-ARG PHUSION_VERSION="latest"
+ARG PHUSION_VERSION="bionic-1.0.0"
 FROM phusion/baseimage:${PHUSION_VERSION}
 
-# labels
 LABEL description = "Apache Storm (all-in-one): zookeeper, nimbus, ui, supervisor"
 
-# args that can change from command line
-ARG GPG_KEY=ACEFE18DD2322E1E84587A148DE03962E80B8FFD
-ARG DISTRO_NAME=apache-storm-1.2.2
+# Args that can be changed from the command line
+ARG GPG_KEY=79B03D059E628478FC9F1D8B152CAD0C46E87B61
+ARG STORM_RELEASE=apache-storm-2.2.0
 
-# environment variables
+# Environment variables
 ENV STORM_CONF_DIR=/conf \
     STORM_DATA_DIR=/data \
     STORM_LOG_DIR=/logs \
-    PATH=$PATH:/$DISTRO_NAME/bin
+    PATH=$PATH:/opt/$STORM_RELEASE/bin
 
-# make directories
+# Create directories
 RUN set -ex; \
     mkdir -p "/etc/service/zookeeperd" "/etc/service/nimbus" "/etc/service/supervisor" "/etc/service/ui"; \
     mkdir -p "$STORM_CONF_DIR" "$STORM_DATA_DIR" "$STORM_LOG_DIR"; \
-# install packages
-    apt-get -yqq update; \
-    apt-get -yqq upgrade -o Dpkg::Options::="--force-confold"; \
-    apt-get -yqq --no-install-recommends install \
-        curl \
-        openjdk-8-jre \
-        python \
-        zookeeperd; \
-    apt-get clean; \
-    rm -rf /var/lib/apt/lists/*; \
+# Install dependencies
+    apt-get -y update; \
+    apt-get -y upgrade -o Dpkg::Options::="--force-confold"; \
+    apt-get -y --no-install-recommends install openjdk-11-jre zookeeperd; \
+# Set python3 as default interpreter
+    update-alternatives --install /usr/bin/python python /usr/bin/python3 10; \
 # Download Apache Storm, verify its PGP signature, untar and clean up
-    curl -So "$DISTRO_NAME.tar.gz" "http://www.apache.org/dist/storm/$DISTRO_NAME/$DISTRO_NAME.tar.gz"; \
-    curl -So "$DISTRO_NAME.tar.gz.asc" "http://www.apache.org/dist/storm/$DISTRO_NAME/$DISTRO_NAME.tar.gz.asc"; \
+    curl -LSo "/tmp/$STORM_RELEASE.tar.gz" "https://downloads.apache.org/storm/$STORM_RELEASE/$STORM_RELEASE.tar.gz"; \
+    curl -LSo "/tmp/$STORM_RELEASE.tar.gz.asc" "https://downloads.apache.org/storm/$STORM_RELEASE/$STORM_RELEASE.tar.gz.asc"; \
     export GNUPGHOME="$(mktemp -d)"; \
+    # https://github.com/f-secure-foundry/usbarmory-debian-base_image/issues/9
+    echo "disable-ipv6" >> ${GNUPGHOME}/dirmngr.conf; \
     gpg --keyserver ha.pool.sks-keyservers.net --recv-key "$GPG_KEY" || \
-    gpg --keyserver pgp.mit.edu --recv-keys "$GPG_KEY" || \
-    gpg --keyserver keyserver.pgp.com --recv-keys "$GPG_KEY"; \
-    gpg --batch --verify "$DISTRO_NAME.tar.gz.asc" "$DISTRO_NAME.tar.gz"; \
-    tar -xzf "$DISTRO_NAME.tar.gz"; \
-    rm -rf "$GNUPGHOME" "$DISTRO_NAME.tar.gz" "$DISTRO_NAME.tar.gz.asc";
+    gpg --keyserver pgp.mit.edu --recv-key "$GPG_KEY" || \
+    gpg --keyserver keyserver.pgp.com --recv-key "$GPG_KEY"; \
+    gpg --batch --verify "/tmp/$STORM_RELEASE.tar.gz.asc" "/tmp/$STORM_RELEASE.tar.gz"; \
+    tar -C /opt -xzf "/tmp/$STORM_RELEASE.tar.gz"; \
+# Clean up
+    rm -rf "$GNUPGHOME" "/tmp/$STORM_RELEASE.tar.gz" "/tmp/$STORM_RELEASE.tar.gz.asc"; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*
 
-WORKDIR $DISTRO_NAME
+WORKDIR /opt/$STORM_RELEASE
 
-# copy run scripts
+# Copy service scripts
 COPY run/zookeeperd.sh /etc/service/zookeeperd/run
 COPY run/nimbus.sh /etc/service/nimbus/run
 COPY run/supervisor.sh /etc/service/supervisor/run
 COPY run/ui.sh /etc/service/ui/run
 COPY run/logviewer.sh /etc/service/logviewer/run
 
-# copy configuration
+# Copy configuration
 COPY zookeeper/zoo.cfg /etc/zookeeper/conf/zoo.cfg
 COPY storm/storm.yaml $STORM_CONF_DIR/storm.yaml
 
@@ -56,11 +56,11 @@ RUN set -ex; \
     sed -i "s!storm.log.dir:.*!storm.log.dir: $STORM_LOG_DIR!g" $STORM_CONF_DIR/storm.yaml; \
     sed -i "s!storm.local.dir:.*!storm.local.dir: $STORM_DATA_DIR!g" $STORM_CONF_DIR/storm.yaml;
 
-# ports
+# Ports
 EXPOSE 8080 8000
 
-# volume
+# Volume
 VOLUME ["/logs"]
 
-# init for phusion/baseimage
+# Init for phusion/baseimage
 CMD ["/sbin/my_init"]

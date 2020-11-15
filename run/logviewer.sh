@@ -1,3 +1,3 @@
 #!/bin/sh
 
-/bin/bash -c "storm logviewer"
+exec storm logviewer

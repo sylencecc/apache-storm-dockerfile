@@ -1,3 +1,3 @@
 #!/bin/sh
 
-/bin/bash -c "storm supervisor"
+exec storm supervisor

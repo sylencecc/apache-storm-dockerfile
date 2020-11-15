@@ -1,3 +1,3 @@
 #!/bin/sh
 
-/bin/bash -c "storm ui"
+exec storm ui
