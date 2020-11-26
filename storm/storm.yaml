@@ -4,4 +4,5 @@ nimbus.seeds: ["localhost"]
 storm.log.dir: "/logs"
 storm.local.dir: "/data"
 worker.heap.memory.mb: 2048
+worker.childopts: "-Xmx%HEAP-MEM%m -Xlog:gc:artifacts/gc.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=artifacts/heapdump"
 topology.worker.max.heap.size.mb: 1024.0
